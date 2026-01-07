@@ -9,6 +9,11 @@ export interface User {
 export interface Client {
   id: string
   name: string
+  whop_company_id: string | null
+  company_slug: string | null
+  user_id: string | null
+  is_active: boolean | null
+  enabled: boolean | null
   created_at: string
   updated_at: string
 }

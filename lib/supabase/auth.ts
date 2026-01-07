@@ -46,13 +46,25 @@ export async function getUserRole(userId: string): Promise<UserRole> {
       return data.role as UserRole
     } else if (error) {
       console.error('Error fetching role:', error.code, error.message)
-      // If it's a "not found" error, that's okay - we'll try fallback
-      if (error.code !== 'PGRST116') {
-        throw error
+      // Handle specific error codes
+      if (error.code === 'PGRST116') {
+        // No rows found - user doesn't have a role yet
+        console.log('No role record found for user')
+      } else if (error.code === '42P17' || error.message?.includes('infinite recursion')) {
+        // RLS recursion error - try using service role or bypass
+        console.warn('RLS recursion detected, trying alternative method')
+        // We'll fall through to metadata check
+      } else {
+        // Other errors - log but don't throw, try fallback
+        console.warn('Role query error, trying fallback:', error.message)
       }
     }
   } catch (err: any) {
     console.error('Exception fetching role from user_roles table:', err)
+    // If it's a recursion error, continue to fallback
+    if (err.code === '42P17' || err.message?.includes('infinite recursion')) {
+      console.warn('RLS recursion error caught, using fallback')
+    }
   }
 
   // Fallback to checking user_metadata

@@ -12,6 +12,10 @@ export default function AdminClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
+  const [newWhopCompanyId, setNewWhopCompanyId] = useState('')
+  const [creating, setCreating] = useState(false)
   const hasLoadedRef = useRef(false)
 
   useEffect(() => {
@@ -89,6 +93,76 @@ export default function AdminClientsPage() {
     client.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const handleCreateClient = async () => {
+    if (!newClientName.trim() || !newWhopCompanyId.trim()) {
+      alert('Please fill in both name and Whop Company ID')
+      return
+    }
+
+    setCreating(true)
+    try {
+      console.log('Creating client:', { name: newClientName.trim(), whop_company_id: newWhopCompanyId.trim() })
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .insert([
+          {
+            name: newClientName.trim(),
+            whop_company_id: newWhopCompanyId.trim(),
+            enabled: true,
+            is_active: true,
+          },
+        ])
+        .select()
+        .single()
+
+      console.log('Create client result:', { data, error })
+
+      if (error) {
+        console.error('Error creating client:', error)
+        throw error
+      }
+
+      if (data) {
+        console.log('Client created successfully:', data)
+        setClients([...clients, data])
+        setShowCreateModal(false)
+        setNewClientName('')
+        setNewWhopCompanyId('')
+        // Reload clients to ensure we have the latest data
+        loadClients()
+      }
+    } catch (error: any) {
+      console.error('Error creating client:', error)
+      alert(`Failed to create client: ${error.message || 'Unknown error'}`)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleToggleEnabled = async (clientId: string, currentEnabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ enabled: !currentEnabled, is_active: !currentEnabled })
+        .eq('id', clientId)
+
+      if (error) throw error
+
+      // Update local state
+      setClients(
+        clients.map((client) =>
+          client.id === clientId
+            ? { ...client, enabled: !currentEnabled, is_active: !currentEnabled }
+            : client
+        )
+      )
+    } catch (error: any) {
+      console.error('Error toggling client enabled state:', error)
+      alert(`Failed to update client: ${error.message}`)
+    }
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -160,9 +234,17 @@ export default function AdminClientsPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Select Client</h1>
-          <p className="text-gray-400">Choose a client to manage their configuration</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Select Client</h1>
+            <p className="text-gray-400">Choose a client to manage their configuration</p>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          >
+            + Create Client
+          </button>
         </div>
 
         <div className="mb-6">
@@ -177,16 +259,52 @@ export default function AdminClientsPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.map((client) => (
-            <button
+            <div
               key={client.id}
-              onClick={() => router.push(`/admin/clients/${client.id}`)}
-              className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-6 hover:border-blue-500 hover:bg-[#1f1f1f] transition-all text-left"
+              className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-6 hover:border-blue-500 hover:bg-[#1f1f1f] transition-all"
             >
-              <h2 className="text-xl font-semibold text-white mb-2">{client.name}</h2>
-              <p className="text-sm text-gray-400">
-                Created: {new Date(client.created_at).toLocaleDateString()}
-              </p>
-            </button>
+              <div className="flex items-start justify-between mb-4">
+                <button
+                  onClick={() => router.push(`/admin/clients/${client.id}`)}
+                  className="flex-1 text-left"
+                >
+                  <h2 className="text-xl font-semibold text-white mb-2">{client.name}</h2>
+                  {client.whop_company_id && (
+                    <p className="text-xs text-gray-500 mb-2">ID: {client.whop_company_id}</p>
+                  )}
+                  <p className="text-sm text-gray-400">
+                    Created: {new Date(client.created_at).toLocaleDateString()}
+                  </p>
+                </button>
+                <div
+                  className="ml-4 flex items-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={client.enabled ?? client.is_active ?? true}
+                      onChange={() =>
+                        handleToggleEnabled(client.id, client.enabled ?? client.is_active ?? true)
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    client.enabled ?? client.is_active ?? true
+                      ? 'bg-green-600/20 text-green-300'
+                      : 'bg-gray-600/20 text-gray-400'
+                  }`}
+                >
+                  {client.enabled ?? client.is_active ?? true ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
           ))}
         </div>
 
@@ -197,30 +315,79 @@ export default function AdminClientsPage() {
             </p>
             {!searchQuery && (
               <button
-                onClick={async () => {
-                  try {
-                    const { data, error } = await supabase
-                      .from('clients')
-                      .insert([{ name: 'Test Client' }])
-                      .select()
-                      .single()
-
-                    if (error) throw error
-                    if (data) {
-                      // Reload clients
-                      setClients([data])
-                      setLoading(false)
-                    }
-                  } catch (error) {
-                    console.error('Error creating test client:', error)
-                    alert('Failed to create test client. Check console for details.')
-                  }
-                }}
+                onClick={() => setShowCreateModal(true)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
-                Create Test Client
+                Create Your First Client
               </button>
             )}
+          </div>
+        )}
+
+        {/* Create Client Modal */}
+        {showCreateModal && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowCreateModal(false)
+              setNewClientName('')
+              setNewWhopCompanyId('')
+            }}
+          >
+            <div
+              className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold text-white mb-4">Create New Client</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Client Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    placeholder="Enter client name"
+                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Whop Company ID <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newWhopCompanyId}
+                    onChange={(e) => setNewWhopCompanyId(e.target.value)}
+                    placeholder="Enter Whop Company ID"
+                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setNewClientName('')
+                    setNewWhopCompanyId('')
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateClient}
+                  disabled={creating || !newClientName.trim() || !newWhopCompanyId.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? 'Creating...' : 'Create Client'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

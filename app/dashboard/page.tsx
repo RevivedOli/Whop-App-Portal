@@ -8,7 +8,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { AIConfigTab } from '@/components/tabs/AIConfigTab'
 
 export default function ClientDashboardPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, role, loading: authLoading } = useAuth()
   const router = useRouter()
   const [clientId, setClientId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -22,12 +22,18 @@ export default function ClientDashboardPage() {
       return
     }
 
-    // Only load client ID once when user is available
-    if (user && !hasLoadedRef.current) {
+    // If user is admin, redirect to admin clients page
+    if (role === 'admin') {
+      router.push('/admin/clients')
+      return
+    }
+
+    // Only load client ID once when user is available (and not admin)
+    if (user && role === 'client' && !hasLoadedRef.current) {
       hasLoadedRef.current = true
       loadClientId()
     }
-  }, [user, authLoading]) // Removed router and clientId from deps to prevent loops
+  }, [user, role, authLoading]) // Removed router and clientId from deps to prevent loops
 
   // Timeout fallback - if loading takes too long, stop loading
   useEffect(() => {
@@ -82,6 +88,17 @@ export default function ClientDashboardPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // If admin, show loading while redirecting
+  if (role === 'admin') {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-white mb-4">Redirecting to admin dashboard...</div>
+        </div>
+      </div>
+    )
   }
 
   if (authLoading || loading) {
