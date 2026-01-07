@@ -9,19 +9,40 @@ To enable Whop API integration, you need to add the following to your `.env` fil
 ```bash
 # Add this to your .env file
 WHOP_API_KEY="your_whop_api_key_here"
+
+# If using an App API key (required for accessing multiple companies), also add:
+WHOP_APP_ID="app_xxxxxxxxxxxxxx"
 ```
 
 **Note**: Create a `.env` file in the root of your project if it doesn't exist. You can copy `.env.example` as a template (if it exists) or create it manually.
 
 ## How to Get Your Whop API Key
 
-1. Go to [Whop Apps](https://whop.com/apps)
+### For App API Keys (Recommended for Admin Portal)
+
+Since this is an admin portal that manages multiple companies, you'll need an **App API Key**:
+
+1. Go to [Whop Developer Dashboard](https://whop.com/apps)
 2. Sign in to your Whop account
-3. Navigate to your app settings
-4. Go to the "API Keys" or "Developer" section
-5. Create a new API key or copy an existing one
-6. Make sure the API key has the following permissions:
+3. Click **"Create app"** button and give your app a name
+4. Your **API key** is in the `Environment variables` section (hidden text after `WHOP_API_KEY`)
+5. Your **App ID** is also shown in the same section (format: `app_xxxxxxxxxxxxxx`)
+6. Copy both values to your `.env` file as `WHOP_API_KEY` and `WHOP_APP_ID`
+7. Make sure your app has the required permissions:
    - `company:basic:read` - Required to fetch company information
+   - `courses:read` - Required to fetch courses data
+   - `experiences:read` - Required to fetch experiences
+
+### For Company API Keys (Single Company Only)
+
+If you only need to access one company's data:
+
+1. Go to [Whop Developer Dashboard](https://whop.com/apps)
+2. Click the **"Create"** button in the **"Company API Keys"** section
+3. Give your API key a name
+4. Select appropriate permissions
+5. Copy the API key to your `.env` file as `WHOP_API_KEY`
+6. **Note**: Company API keys don't require `WHOP_APP_ID`
 
 ## What This Does
 
